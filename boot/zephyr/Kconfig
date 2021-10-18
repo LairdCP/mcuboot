@@ -271,6 +271,15 @@ config BOOT_DIRECT_XIP
 
 endchoice
 
+config CHECK_IMAGE_TLV
+	bool "Check image number TLV"
+	depends on UPDATEABLE_IMAGE_NUMBER > 1
+	default y
+	help
+	  If y, will check images for a TLV which enforces which image number
+	  the upgrade is designed for and delete the image if it has been
+	  loaded into the wrong slot.
+
 config BOOT_DIRECT_XIP_REVERT
 	bool "Enable the revert mechanism in direct-xip mode"
 	depends on BOOT_DIRECT_XIP

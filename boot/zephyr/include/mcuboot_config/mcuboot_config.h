@@ -65,6 +65,10 @@
 #define MCUBOOT_SWAP_USING_MOVE 1
 #endif
 
+#ifdef CONFIG_CHECK_IMAGE_TLV
+#define MCUBOOT_CHECK_IMAGE_TLV 1
+#endif
+
 #ifdef CONFIG_BOOT_DIRECT_XIP
 #define MCUBOOT_DIRECT_XIP
 #endif

@@ -728,6 +728,12 @@ boot_validate_slot(struct boot_loader_state *state, int slot,
     int area_id;
     fih_int fih_rc = FIH_FAILURE;
     int rc;
+#if defined(MCUBOOT_CHECK_IMAGE_TLV)
+    struct image_tlv_iter it;
+    uint32_t off;
+    uint16_t len;
+    uint8_t slot_number = 0;
+#endif
 
     area_id = flash_area_id_from_multi_image_slot(BOOT_CURR_IMG(state), slot);
     rc = flash_area_open(area_id, &fap);
@@ -777,6 +783,56 @@ boot_validate_slot(struct boot_loader_state *state, int slot,
         }
     }
 #endif
+
+#if defined(MCUBOOT_CHECK_IMAGE_TLV)
+    if (slot != BOOT_PRIMARY_SLOT) {
+        /* Check if there is a image section in the TLV */
+        rc = bootutil_tlv_iter_begin(&it, boot_img_hdr(state, BOOT_SECONDARY_SLOT), fap,
+                IMAGE_TLV_IMAGE_NUMBER, true);
+
+        if (rc == 0) {
+            rc = bootutil_tlv_iter_next(&it, &off, &len, NULL);
+
+            if (rc < 0) {
+                goto tlvcheckdone;
+            } else if (rc > 0) {
+                /* No image number TLV section found */
+                rc = 0;
+                goto tlvcheckdone;
+            }
+
+            /* Image number TLV section present and found */
+            if (len != sizeof(slot_number)) {
+                /* Erase */
+                rc = -1;
+                goto tlvcheckdone;
+            }
+
+            rc = flash_area_read(fap, off, &slot_number, len);
+            if (rc != 0) {
+                goto out;
+            }
+
+            if (BOOT_CURR_IMG(state) != slot_number) {
+                /* Invalid slot area */
+                rc = -1;
+            }
+        }
+
+tlvcheckdone:
+        if (rc != 0) {
+            BOOT_LOG_ERR("Secondary slot for image %d is for image %d!",
+                         slot_number, BOOT_CURR_IMG(state));
+            flash_area_erase(fap, 0, fap->fa_size);
+            /* Image in the secondary slot is for another image area.
+             * Erase the image and continue booting from the primary slot.
+             */
+            fih_rc = fih_int_encode(1);
+            goto out;
+        }
+    }
+#endif
+
     BOOT_HOOK_CALL_FIH(boot_image_check_hook, fih_int_encode(BOOT_HOOK_REGULAR),
                        fih_rc, BOOT_CURR_IMG(state), slot);
     if (fih_eq(fih_rc, BOOT_HOOK_REGULAR))
